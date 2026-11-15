@@ -68,7 +68,7 @@ p{margin:0;color:var(--mut)}
   <p style="color:var(--ink);font-weight:600">Konu ne kadar uzakta?</p>
   <div class="dist" id="dist"></div>
   <p id="s0note">Gerisini biz yönlendiririz. Telefonu yana kaydırman yeterli, doğru kareleri uygulama seçer.</p>
-  <p style="font-size:.75rem">sürüm 4 (hizalama düzeltmeli)</p>
+  <p style="font-size:.75rem">sürüm 5 (yoğun ölçüm)</p>
   <div class="spacer"></div>
   <button class="btn" id="start">Kamerayı aç</button>
 </section>
@@ -161,7 +161,8 @@ function gray(src,w,h){
 let meas=null;
 function parallax(a,b,h,g){
   const R=8,E=4,res=[];g=g||{d:0,e:0};
-  for(const cy of [h*.33,h*.67])for(const cx of [60,120,180]){
+  for(const f of [.12,.37,.62,.87])for(const cx of [60,120,180]){
+    const cy=Math.min(h-34,Math.max(34,h*f));
     const x0=cx-20,x1=cx+20,y0=Math.round(cy-20),y1=Math.round(cy+20);
     let mean=0,n=0,v=0;
     for(let y=y0;y<y1;y+=2)for(let x=x0;x<x1;x+=2){mean+=a[y*GW+x];n++}
@@ -177,7 +178,7 @@ function parallax(a,b,h,g){
     if(best<1e9)res.push({d:bd,e:be});
   }
   const n=res.length;if(n<4)return{n,spread:0,e:0};
-  const ds=res.map(r=>r.d).sort((p,q)=>p-q),es=res.map(r=>r.e).sort((p,q)=>p-q),k=Math.max(1,Math.floor(n/3));
+  const ds=res.map(r=>r.d).sort((p,q)=>p-q),es=res.map(r=>r.e).sort((p,q)=>p-q),k=Math.max(1,Math.floor(n/4));
   const lo=ds.slice(0,k).reduce((s,x)=>s+x,0)/k,hi=ds.slice(-k).reduce((s,x)=>s+x,0)/k;
   return{n,spread:Math.abs(hi-lo),e:es[n>>1]};
 }
