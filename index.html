@@ -68,7 +68,7 @@ p{margin:0;color:var(--mut)}
   <p style="color:var(--ink);font-weight:600">Konu ne kadar uzakta?</p>
   <div class="dist" id="dist"></div>
   <p id="s0note">Gerisini biz yönlendiririz. Telefonu yana kaydırman yeterli, doğru kareleri uygulama seçer.</p>
-  <p style="font-size:.75rem">sürüm 3 (derinlik ölçümlü)</p>
+  <p style="font-size:.75rem">sürüm 4 (hizalama düzeltmeli)</p>
   <div class="spacer"></div>
   <button class="btn" id="start">Kamerayı aç</button>
 </section>
@@ -94,8 +94,8 @@ p{margin:0;color:var(--mut)}
   <div class="canvasbox"><canvas id="out"></canvas></div>
   <p id="modeNote" style="font-size:.9rem"></p>
   <p id="qual" style="font-size:.9rem;color:var(--ink)"></p>
-  <label class="sl">Yatay hizala<input type="range" id="dx" min="-120" max="120" value="0"></label>
-  <label class="sl">Dikey hizala<input type="range" id="dy" min="-60" max="60" value="0"></label>
+  <label class="sl">Yatay hizala<input type="range" id="dx" min="-300" max="300" value="0"></label>
+  <label class="sl">Dikey hizala<input type="range" id="dy" min="-80" max="80" value="0"></label>
   <div class="row">
     <button class="btn alt" id="swap">Gözleri değiştir</button>
     <button class="btn alt" id="again">Yeni çekim</button>
@@ -159,20 +159,22 @@ function gray(src,w,h){
   return{g,h:gh};
 }
 let meas=null;
-function parallax(a,b,h){
-  const M=24,E=6,res=[];
+function parallax(a,b,h,g){
+  const R=8,E=4,res=[];g=g||{d:0,e:0};
   for(const cy of [h*.33,h*.67])for(const cx of [60,120,180]){
-    const x0=cx-25,x1=cx+25,y0=Math.round(cy-20),y1=Math.round(cy+20);
+    const x0=cx-20,x1=cx+20,y0=Math.round(cy-20),y1=Math.round(cy+20);
     let mean=0,n=0,v=0;
     for(let y=y0;y<y1;y+=2)for(let x=x0;x<x1;x+=2){mean+=a[y*GW+x];n++}
     mean/=n;
     for(let y=y0;y<y1;y+=2)for(let x=x0;x<x1;x+=2)v+=Math.abs(a[y*GW+x]-mean);
     if(v/n<5)continue;
     let best=1e9,bd=0,be=0;
-    for(let e=-E;e<=E;e++)for(let d=-M;d<=M;d++){let s=0;
-      for(let y=y0;y<y1;y+=2){const r=y*GW,r2=(y-e)*GW;for(let x=x0;x<x1;x+=2)s+=Math.abs(a[r+x]-b[r2+x-d])}
-      if(s<best){best=s;bd=d;be=e}}
-    res.push({d:bd,e:be});
+    for(let e=g.e-E;e<=g.e+E;e++){if(y0-e<0||y1-1-e>=h)continue;
+      for(let d=g.d-R;d<=g.d+R;d++){if(x0-d<0||x1-1-d>=GW)continue;
+        let s=0;
+        for(let y=y0;y<y1;y+=2){const r=y*GW,r2=(y-e)*GW;for(let x=x0;x<x1;x+=2)s+=Math.abs(a[r+x]-b[r2+x-d])}
+        if(s<best){best=s;bd=d;be=e}}}
+    if(best<1e9)res.push({d:bd,e:be});
   }
   const n=res.length;if(n<4)return{n,spread:0,e:0};
   const ds=res.map(r=>r.d).sort((p,q)=>p-q),es=res.map(r=>r.e).sort((p,q)=>p-q),k=Math.max(1,Math.floor(n/3));
@@ -180,17 +182,19 @@ function parallax(a,b,h){
   return{n,spread:Math.abs(hi-lo),e:es[n>>1]};
 }
 function quality(){
-  const a=gray(shots[0],shots[0].width,shots[0].height),b=gray(shots[1],shots[1].width,shots[1].height);
-  const pr=parallax(a.g,b.g,a.h),px=pr.spread,pct=(px/GW*100).toFixed(1).replace(".",",");
+  const W=shots[0].width,a=gray(shots[0],W,shots[0].height),b=gray(shots[1],W,shots[1].height);
+  const g=shiftEst(a.g,b.g,a.h),pr=parallax(a.g,b.g,a.h,g),px=pr.spread,pct=(px/GW*100).toFixed(1).replace(".",",");
+  const cl=(v,m)=>Math.max(-m,Math.min(m,Math.round(v)));
+  $("#dx").value=cl(g.d/GW*W,300);$("#dy").value=cl(g.e/GW*W,80);render();
   let v;
-  if(pr.n<4)v="ölçülemedi (sahne düz ya da dokusuz)";
-  else if(px>=4)v="güçlü derinlik";else if(px>=2.5)v="orta derinlik";else v="zayıf, iki kare birbirine çok benziyor";
-  $("#qual").textContent="3D kalite: "+v+(pr.n>=4?" (derinlik farkı %"+pct+", dikey kayma "+Math.abs(pr.e)+" px, otomatik düzeltildi)":"")+".";
+  if(pr.n<4)v="\u00f6l\u00e7\u00fclemedi (sahne d\u00fcz ya da dokusuz)";
+  else if(px>=4)v="g\u00fc\u00e7l\u00fc derinlik";else if(px>=2.5)v="orta derinlik";else v="zay\u0131f, iki kare birbirine \u00e7ok benziyor";
+  $("#qual").textContent="3D kalite: "+v+(pr.n>=4?" (derinlik fark\u0131 %"+pct+"; yatay hizalama %"+Math.round(Math.abs(g.d)/GW*100)+" ve dikey "+Math.abs(g.e)+" px otomatik d\u00fczeltildi)":"")+".";
 }
 function shiftEst(a,b,h){
-  const y0=Math.round(h*.25),y1=Math.round(h*.75),M=24,E=8;let best=1e9,bd=0,be=0;
+  const y0=Math.round(h*.25),y1=Math.round(h*.75),M=60,E=8;let best=1e9,bd=0,be=0;
   for(let e=-E;e<=E;e++)for(let d=-M;d<=M;d++){let s=0,n=0;
-    for(let y=y0;y<y1;y+=2){const r=y*GW,r2=(y-e)*GW;for(let x=M;x<GW-M;x+=2){s+=Math.abs(a[r+x]-b[r2+x-d]);n++}}
+    for(let y=y0;y<y1;y+=3){const r=y*GW,r2=(y-e)*GW;for(let x=M;x<GW-M;x+=3){s+=Math.abs(a[r+x]-b[r2+x-d]);n++}}
     s/=n;if(s<best){best=s;bd=d;be=e}}
   return{d:bd,e:be};
 }
@@ -212,7 +216,7 @@ function tick(){
   const L=gray(v,v.videoWidth,v.videoHeight),r=shiftEst(ref.g,L.g,L.h),T=DIST[di][2];
   const el=Date.now()-t0,tout=el>15000,p=Math.max(0,r.d/GW/T);
   let q=0,n=0;
-  if(p>.4){const pr=parallax(ref.g,L.g,L.h);q=pr.spread/GW/T;n=pr.n}
+  if(p>.4){const pr=parallax(ref.g,L.g,L.h,r);q=pr.spread/GW/T;n=pr.n}
   maxP=Math.max(maxP,p);maxQ=Math.max(maxQ,q);
   const m=n>=4?q:0;
   $("#dbg").textContent="kayma %"+Math.round(p*100)+" · derinlik farkı %"+Math.round(q*100)+" · dikey "+r.e;
@@ -342,8 +346,9 @@ function render(){
       if(f=!f)ctx.drawImage(L,0,0);else ctx.drawImage(R,dx,dy,W,H)};
     draw();timer=setInterval(draw,140);
   }else{
-    cv.width=W*2;cv.height=H;ctx.fillStyle="#000";ctx.fillRect(0,0,W*2,H);
-    ctx.drawImage(L,0,0);ctx.drawImage(R,W+dx,dy,W,H);
+    const cw=W-Math.abs(dx),ch=H-Math.abs(dy),lx=Math.max(0,dx),rx=Math.max(0,-dx),ly=Math.max(0,dy),ry=Math.max(0,-dy);
+    cv.width=cw*2;cv.height=ch;
+    ctx.drawImage(L,lx,ly,cw,ch,0,0,cw,ch);ctx.drawImage(R,rx,ry,cw,ch,cw,0,cw,ch);
   }
 }
 const lazy=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(render)};
